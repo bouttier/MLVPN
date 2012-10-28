@@ -99,6 +99,7 @@ pktdata_t *
 mlvpn_reorder_get_next(reorder_buffer_t *buf)
 {
     int i;
+    int found = 0;
     pktdata_t *pktdata = NULL;
 
     /* Initialization condition, find the "lower sequence packet" in queue. */
@@ -117,6 +118,8 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         /* Weird! (safety check) */
         if (min == REORDER_MAX_SEQ + 1)
             min = 0;
+
+        _DEBUG("[reorder] initial found minimum sequence: %d\n", min);
         buf->next_seq = min;
     }
 
@@ -132,11 +135,12 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         {
             buf->used[i] = 0;
             buf->elems--;
+            found = 1;
             break;
         }
     }
 
-    if (pktdata)
+    if (found)
     {
         /* Set next waiting packet to current value +1 */
         if (buf->next_seq == REORDER_MAX_SEQ)
