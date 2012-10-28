@@ -24,19 +24,20 @@ mlvpn_reorder_init(int size)
     /* Basic circular buffer allocation */
     buf = malloc(sizeof(reorder_buffer_t));
     buf->size = size;
-    buf->pos = 0;
+    buf->elems = 0;
     buf->timeout = 0;
     buf->next_seq = 0;
     buf->pkts = malloc(buf->size * sizeof(pktdata_t *));
-
     for(i = 0; i < buf->size; i++)
         buf->pkts[i] = calloc(1, sizeof(pktdata_t));
+    buf->used = calloc(sizeof(int), buf->size);
     return buf;
 }
 
 void
 mlvpn_reorder_free(reorder_buffer_t *buf)
 {
+    free(buf->used);
     free(buf->pkts);
     free(buf);
 }
@@ -44,21 +45,22 @@ mlvpn_reorder_free(reorder_buffer_t *buf)
 int
 mlvpn_reorder_is_full(reorder_buffer_t *buf)
 {
-    return (buf->pos == buf->size) ? 1 : 0;
+    return (buf->elems == buf->size) ? 1 : 0;
 }
 
 int
 mlvpn_reorder_is_empty(reorder_buffer_t *buf)
 {
-    return (buf->pos == 0) ? 1 : 0;
+    return (buf->elems == 0) ? 1 : 0;
 }
 
 void
 mlvpn_reorder_flush(reorder_buffer_t *buf)
 {
     _INFO("[reorder] buffer flush.\n");
-    buf->pos = 0;
+    buf->elems = 0;
     buf->timeout = 0;
+    memset(buf->used, 0, sizeof(int) * buf->size);
 }
 
 /* returns 1 if timeout condition is reached. 0 otherwise. */
@@ -73,6 +75,7 @@ int
 mlvpn_reorder_put(reorder_buffer_t *buf, pktdata_t *pktdata)
 {
     int ret = 0;
+    int i;
     _DEBUG("[reorder] new packet received. Seq: %u\n", pktdata->seq);
     if (mlvpn_reorder_is_full(buf))
     {
@@ -80,7 +83,11 @@ mlvpn_reorder_put(reorder_buffer_t *buf, pktdata_t *pktdata)
         mlvpn_reorder_flush(buf);
         ret = 1;
     }
-    memcpy(buf->pkts[buf->pos++], pktdata, sizeof(pktdata_t));
+    for(i = 0; i < buf->size && buf->used[i] == 1; i++);
+
+    memcpy(buf->pkts[i], pktdata, sizeof(pktdata_t));
+    buf->used[i] = 1;
+    buf->elems++;
     return ret;
 }
 
@@ -98,8 +105,10 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
     if (buf->next_seq == 0)
     {
         int min = REORDER_MAX_SEQ + 1;
-        for(i = 0; i < buf->pos; i++)
+        for(i = 0; i < buf->size; i++)
         {
+            if (buf->used[i] == 0)
+                continue;
             pktdata = buf->pkts[i];
             if (pktdata->seq < min)
                 min = pktdata->seq;
@@ -112,11 +121,18 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
     }
 
     /* Find the next packet */
-    for(i = 0; i < buf->pos; i++)
+    for(i = 0; i < buf->size; i++)
     {
+        if (buf->used[i] == 0)
+            continue;
+
         pktdata = buf->pkts[i];
         if (buf->next_seq == pktdata->seq)
+        {
+            buf->used[i] = 0;
+            buf->elems--;
             break;
+        }
     }
 
     if (pktdata)

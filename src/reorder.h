@@ -18,10 +18,11 @@
 typedef struct
 {
     int size;
-    int pos;
+    int elems;
     /* If now is beyond this value, we send the "next" data packet available NOW. */
     uint16_t next_seq;
     uint64_t timeout;
+    int *used;
     pktdata_t **pkts;
 } reorder_buffer_t;
 
