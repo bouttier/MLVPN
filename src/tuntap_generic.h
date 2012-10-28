@@ -25,9 +25,11 @@ struct tuntap_s
 {
     int fd;
     int mtu;
-    char devname[MLVPN_IFNAMSIZ];
     enum tuntap_type type;
+    /* Packet sequence (for re-ordering system) */
+    uint16_t seq;
     circular_buffer_t *sbuf;
+    char devname[MLVPN_IFNAMSIZ];
 };
 
 int mlvpn_tuntap_alloc(struct tuntap_s *tuntap);

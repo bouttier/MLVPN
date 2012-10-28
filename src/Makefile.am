@@ -29,5 +29,9 @@ if MLVPN_CONTROL
 mlvpn_SOURCES += control.c
 endif
 
+if MLVPN_REORDER
+mlvpn_SOURCES += reorder.c
+endif
+
 mlvpn_LDFLAGS=-lm
 CFLAGS=-g -Wall -Wno-strict-aliasing -Wno-format-zero-length

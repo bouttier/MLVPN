@@ -40,6 +40,10 @@
 #include "strlcpy.h"
 #include "tuntap_generic.h"
 
+#ifdef HAVE_MLVPN_REORDER
+#include "reorder.h"
+#endif
+
 /* Linux specific things */
 #ifdef HAVE_LINUX
  #include <sys/prctl.h>
@@ -58,6 +62,10 @@ int reload_config_needed = 0;
 
 /* "private" */
 static char *status_command = NULL;
+
+#ifdef HAVE_MLVPN_REORDER
+static reorder_buffer_t *reorder_buffer;
+#endif
 
 /* Statistics */
 time_t start_time;
@@ -757,7 +765,7 @@ mlvpn_rtun_check_timeout()
 int
 mlvpn_rtun_tick_rbuf(mlvpn_tunnel_t *tun)
 {
-    struct mlvpn_pktdata pktdata;
+    pktdata_t pktdata;
     size_t i;
     int pkts = 0;
     int last_shift = -1;
@@ -791,6 +799,7 @@ mlvpn_rtun_tick_rbuf(mlvpn_tunnel_t *tun)
                 } else {
                     if (tun->status == MLVPN_CHAP_AUTHOK)
                     {
+#ifndef HAVE_MLVPN_REORDER
                         /* Directly send data to the network */
                         if (mlvpn_cb_is_full(tuntap.sbuf))
                             _WARNING("TUN/TAP buffer overflow.\n");
@@ -798,6 +807,10 @@ mlvpn_rtun_tick_rbuf(mlvpn_tunnel_t *tun)
                         pkt = mlvpn_pktbuffer_write(tuntap.sbuf);
                         pkt->pktdata.len = pktdata.len;
                         memcpy(pkt->pktdata.data, pktdata.data, pktdata.len);
+#else
+                        /* Push data to the re-ordering buffer */
+                        mlvpn_reorder_put(reorder_buffer, &pktdata);
+#endif
                     } else {
                         mlvpn_rtun_chap_dispatch(tun, pktdata.data, pktdata.len);
                     }
@@ -911,6 +924,10 @@ mlvpn_rtun_write_pkt(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     size_t wlen;
 
     mlvpn_pkt_t *pkt = mlvpn_pktbuffer_read(pktbuf);
+    if (tuntap.seq == REORDER_MAX_SEQ)
+        tuntap.seq = 1;
+
+    pkt->pktdata.seq = tuntap.seq++;
 
     wlen = PKTHDRSIZ(pkt->pktdata) + pkt->pktdata.len;
 
@@ -986,6 +1003,23 @@ mlvpn_rtun_timer_write(mlvpn_tunnel_t *t)
         usleep(500);
     }
     return bytesent;
+}
+
+void
+mlvpn_reorder_send(reorder_buffer_t *buf)
+{
+    mlvpn_pkt_t *pkt;
+    pktdata_t *pktdata;
+    while (! mlvpn_reorder_is_empty(buf))
+    {
+        pktdata = mlvpn_reorder_get_next(buf);
+        if (! pktdata)
+            break;
+        if (mlvpn_cb_is_full(tuntap.sbuf))
+            _WARNING("TUN/TAP buffer overflow.\n");
+        pkt = mlvpn_pktbuffer_write(tuntap.sbuf);
+        memcpy(&pkt->pktdata, &pktdata, sizeof(pktdata_t));
+    }
 }
 
 /* Config file reading / re-read.
@@ -1281,6 +1315,7 @@ void mlvpn_tuntap_init()
     tuntap.mtu = 1500;
     tuntap.type = MLVPN_TUNTAPMODE_TUN;
     tuntap.sbuf = mlvpn_pktbuffer_init(PKTBUFSIZE);
+    tuntap.seq = 1;
 }
 
 int
@@ -1441,6 +1476,9 @@ main(int argc, char **argv)
 
     /* tun/tap initialization */
     mlvpn_tuntap_init();
+#ifdef HAVE_MLVPN_REORDER
+    reorder_buffer = mlvpn_reorder_init(MLVPN_REORDER_BUFSIZE);
+#endif
 
     if (mlvpn_config(mlvpn_options.config_fd, 1) != 0)
         _exit(1);
@@ -1626,6 +1664,10 @@ main(int argc, char **argv)
             /* Error */
             _ERROR("Select error: %s\n", strerror(errno));
         }
+
+#ifdef HAVE_MLVPN_REORDER
+        mlvpn_reorder_send(reorder_buffer);
+#endif
 
         if (global_exit > 0)
         {

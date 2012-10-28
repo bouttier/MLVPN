@@ -33,6 +33,9 @@
 /* 1520 * 128 ~= 24 KBytes of data maximum per channel VMSize */
 #define PKTBUFSIZE 128
 
+/* About 750Kbytes of data maximum */
+#define MLVPN_REORDER_BUFSIZE 512
+
 /* tuntap interface name size */
 #ifndef IFNAMSIZ
  #define IFNAMSIZ 16
