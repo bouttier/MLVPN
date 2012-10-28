@@ -120,6 +120,7 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         buf->next_seq = min;
     }
 
+    pktdata = NULL;
     /* Find the next packet */
     for(i = 0; i < buf->size; i++)
     {
