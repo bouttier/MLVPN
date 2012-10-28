@@ -67,7 +67,7 @@ mlvpn_reorder_flush(reorder_buffer_t *buf)
 int
 mlvpn_reorder_timeout(reorder_buffer_t *buf)
 {
-    return (buf->timeout >= mlvpn_millis()) ? 1 : 0;
+    return (buf->timeout <= mlvpn_millis()) ? 1 : 0;
 }
 
 /* Returns 0 if everything is fine or 1 if buffer was full. */

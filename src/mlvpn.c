@@ -1018,7 +1018,7 @@ mlvpn_reorder_send(reorder_buffer_t *buf)
         if (mlvpn_cb_is_full(tuntap.sbuf))
             _WARNING("TUN/TAP buffer overflow.\n");
         pkt = mlvpn_pktbuffer_write(tuntap.sbuf);
-        memcpy(&pkt->pktdata, &pktdata, sizeof(pktdata_t));
+        memcpy(&pkt->pktdata, pktdata, sizeof(pktdata_t));
     }
 }
 
