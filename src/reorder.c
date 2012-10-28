@@ -99,8 +99,8 @@ pktdata_t *
 mlvpn_reorder_get_next(reorder_buffer_t *buf)
 {
     int i;
-    int found = 0;
-    pktdata_t *pktdata = NULL;
+    pktdata_t *tmp = NULL;
+    pktdata_t *ret = NULL;
 
     /* Initialization condition, find the "lower sequence packet" in queue. */
     if (buf->next_seq == 0)
@@ -110,9 +110,9 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         {
             if (buf->used[i] == 0)
                 continue;
-            pktdata = buf->pkts[i];
-            if (pktdata->seq < min)
-                min = pktdata->seq;
+            tmp = buf->pkts[i];
+            if (tmp->seq < min)
+                min = tmp->seq;
         }
 
         /* Weird! (safety check) */
@@ -123,24 +123,23 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         buf->next_seq = min;
     }
 
-    pktdata = NULL;
     /* Find the next packet */
     for(i = 0; i < buf->size; i++)
     {
         if (buf->used[i] == 0)
             continue;
 
-        pktdata = buf->pkts[i];
-        if (buf->next_seq == pktdata->seq)
+        tmp = buf->pkts[i];
+        if (buf->next_seq == tmp->seq)
         {
             buf->used[i] = 0;
             buf->elems--;
-            found = 1;
+            ret = tmp;
             break;
         }
     }
 
-    if (found)
+    if (ret)
     {
         /* Set next waiting packet to current value +1 */
         if (buf->next_seq == REORDER_MAX_SEQ)
@@ -157,5 +156,5 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
             buf->next_seq = 0;
         }
     }
-    return pktdata;
+    return ret;
 }
