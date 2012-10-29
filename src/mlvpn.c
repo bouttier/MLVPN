@@ -925,11 +925,6 @@ mlvpn_rtun_write_pkt(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     size_t wlen;
 
     mlvpn_pkt_t *pkt = mlvpn_pktbuffer_read(pktbuf);
-    if (tuntap.seq == REORDER_MAX_SEQ)
-        tuntap.seq = 1;
-
-    pkt->pktdata.seq = tuntap.seq++;
-
     wlen = PKTHDRSIZ(pkt->pktdata) + pkt->pktdata.len;
 
     if (tun->encap_prot == ENCAP_PROTO_TCP)

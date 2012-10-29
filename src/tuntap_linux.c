@@ -52,6 +52,11 @@ mlvpn_tuntap_read(struct tuntap_s *tuntap)
     }
     pkt->pktdata.len = ret;
 
+    /* Reordering system */
+    if (tuntap.seq == REORDER_MAX_SEQ)
+        tuntap.seq = 1;
+    pkt->pktdata.seq = tuntap.seq++;
+
     return pkt->pktdata.len;
 }
 
