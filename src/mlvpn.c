@@ -806,6 +806,7 @@ mlvpn_rtun_tick_rbuf(mlvpn_tunnel_t *tun)
 
                         pkt = mlvpn_pktbuffer_write(tuntap.sbuf);
                         pkt->pktdata.len = pktdata.len;
+                        pkt->pktdata.seq = pktdata.seq;
                         memcpy(pkt->pktdata.data, pktdata.data, pktdata.len);
 #else
                         /* Push data to the re-ordering buffer */

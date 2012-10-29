@@ -76,16 +76,26 @@ mlvpn_reorder_put(reorder_buffer_t *buf, pktdata_t *pktdata)
 {
     int ret = 0;
     int i;
-    _DEBUG("[reorder] new packet received. Seq: %u\n", pktdata->seq);
+    pktdata_t *dest;
+
+    for(i = 0; i < buf->size && buf->used[i] == 1; i++);
+    dest = buf->pkts[i];
+
+    _DEBUG("[reorder] new packet received. Seq: %u (index: %d)\n",
+            pktdata->seq, i);
     if (mlvpn_reorder_is_full(buf))
     {
         _WARNING("[reorder] buffer is full! Flushing the whole buffer!\n");
         mlvpn_reorder_flush(buf);
         ret = 1;
     }
-    for(i = 0; i < buf->size && buf->used[i] == 1; i++);
 
-    memcpy(buf->pkts[i], pktdata, sizeof(pktdata_t));
+    /* Don't know if that's needed, but we copy a bit less of data
+     * if we do like this rather than brute copy the whole pktdata...
+     */
+    dest->len = pktdata->len;
+    dest->seq = pktdata->seq;
+    memcpy(dest->data, pktdata->data, dest->len);
     buf->used[i] = 1;
     buf->elems++;
     return ret;
@@ -98,7 +108,7 @@ mlvpn_reorder_put(reorder_buffer_t *buf, pktdata_t *pktdata)
 pktdata_t *
 mlvpn_reorder_get_next(reorder_buffer_t *buf)
 {
-    int i;
+    int i, left;
     pktdata_t *tmp = NULL;
     pktdata_t *ret = NULL;
 
@@ -119,18 +129,19 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         if (min == REORDER_MAX_SEQ + 1)
             min = 0;
 
-        _DEBUG("[reorder] initial found minimum sequence: %d\n", min);
+        _DEBUG("[reorder] initial minimum sequence: %d\n", min);
         buf->next_seq = min;
     }
 
     /* Find the next packet */
-    for(i = 0; i < buf->size; i++)
+    for(i = 0, left=buf->elems; i < buf->size && left > 0; i++)
     {
         if (buf->used[i] == 0)
             continue;
+        left--; /* Probably useless */
 
         tmp = buf->pkts[i];
-        if (buf->next_seq == tmp->seq)
+        if (buf->next_seq == 0 || buf->next_seq == tmp->seq)
         {
             buf->used[i] = 0;
             buf->elems--;
@@ -139,6 +150,9 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         }
     }
 
+    /* _DEBUG("[reorder] searching seq=%d found=%d (index=%d)\n",
+     *       buf->next_seq, ret ? ret->seq : -1, i);
+     */
     if (ret)
     {
         /* Set next waiting packet to current value +1 */
@@ -152,6 +166,14 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
         {
             /* DROP all the queue. Must find a better way! */
             _INFO("[reorder] timeout condition.\n");
+            /*
+            for(i = 0; i < buf->size; i++)
+            {
+                if (buf->used[i] == 1)
+                    _DEBUG("Packet trashed seq: %d len: %d.\n",
+                            buf->pkts[i]->seq, buf->pkts[i]->len);
+            }
+            */
             mlvpn_reorder_flush(buf);
             buf->next_seq = 0;
         }
