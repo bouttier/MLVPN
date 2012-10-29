@@ -13,6 +13,9 @@
 #include "buffer.h"
 #include "tuntap_generic.h"
 #include "strlcpy.h"
+#ifdef HAVE_MLVPN_REORDER
+ #include "reorder.h"
+#endif
 
 int
 mlvpn_tuntap_read(struct tuntap_s *tuntap)
@@ -62,10 +65,12 @@ mlvpn_tuntap_read(struct tuntap_s *tuntap)
     }
     pkt->pktdata.len = ret - sizeof(type);
 
+#ifdef HAVE_MLVPN_REORDER
     /* Reordering system */
-    if (tuntap.seq == REORDER_MAX_SEQ)
-        tuntap.seq = 1;
-    pkt->pktdata.seq = tuntap.seq++;
+    if (tuntap->seq == REORDER_MAX_SEQ)
+        tuntap->seq = 1;
+    pkt->pktdata.seq = tuntap->seq++;
+#endif
 
     return pkt->pktdata.len;
 }
