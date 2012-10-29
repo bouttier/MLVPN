@@ -87,6 +87,7 @@ mlvpn_reorder_put(reorder_buffer_t *buf, pktdata_t *pktdata)
     {
         _WARNING("[reorder] buffer is full! Flushing the whole buffer!\n");
         mlvpn_reorder_flush(buf);
+        dest = buf->pkts[0];
         ret = 1;
     }
 
