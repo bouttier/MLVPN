@@ -156,7 +156,7 @@ mlvpn_reorder_get_next(reorder_buffer_t *buf)
     if (ret)
     {
         /* Set next waiting packet to current value +1 */
-        if (buf->next_seq == REORDER_MAX_SEQ)
+        if (buf->next_seq == REORDER_MAX_SEQ - 1)
             buf->next_seq = 1;
         else
             buf->next_seq++;
